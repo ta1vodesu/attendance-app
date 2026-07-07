@@ -23,6 +23,9 @@ function normalizePath(path) {
   if (path.startsWith("/clock-correction/edit") || path.startsWith("/history/edit")) return "/clock-correction/edit";
   return pageMeta[path] ? path : "/dashboard";
 }
+function canAccessPath(path) {
+  return state.role === "admin" || !path.startsWith("/admin");
+}
 function todayLabel() {
   return new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "full",
@@ -77,7 +80,11 @@ function setToast(message) {
 }
 function render() {
   state.path = normalizePath(currentPath());
-  if (state.role === "member" && state.path.startsWith("/admin")) {
+  if (!state.isLoggedIn) {
+    app.innerHTML = renderLogin();
+    return;
+  }
+  if (!canAccessPath(state.path)) {
     state.path = "/dashboard";
     window.location.hash = "/dashboard";
   }
@@ -97,7 +104,41 @@ function render() {
           ${renderPage()}
         </div>
       </main>
+      ${renderBottomNav()}
     </div>
+  `;
+}
+function renderLogin() {
+  return `
+    <main class="login-shell">
+      <section class="login-panel">
+        <div class="brand login-brand">
+          <div class="brand-mark">${icon("clock")}</div>
+          <div>
+            <strong>勤怠管理</strong>
+            <span>Attendance App</span>
+          </div>
+        </div>
+        <div class="login-copy">
+          <h1>ログイン</h1>
+          <p>利用するアカウント種別を選択してログインしてください。</p>
+        </div>
+        <div class="role-toggle login-role-toggle" aria-label="ログイン種別">
+          <button class="${state.loginRole === "member" ? "active" : ""}" data-login-role="member">社員</button>
+          <button class="${state.loginRole === "admin" ? "active" : ""}" data-login-role="admin">管理者</button>
+        </div>
+        <div class="form-field">
+          <label>メールアドレス</label>
+          <input class="input" value="${state.loginRole === "admin" ? "admin@example.com" : "member@example.com"}" />
+        </div>
+        <div class="form-field">
+          <label>パスワード</label>
+          <input class="input" type="password" value="password" />
+        </div>
+        <button class="button primary login-button" data-action="login">${icon("check")}ログイン</button>
+        ${state.toast ? `<div class="notice">${state.toast}</div>` : ""}
+      </section>
+    </main>
   `;
 }
 function renderBrand() {
@@ -118,7 +159,7 @@ function renderNav() {
       adminSectionOpen = true;
       return state.role === "admin" ? '<div class="nav-section"></div>' : "";
     }
-    if (!item.roles.includes(state.role)) return "";
+    if (item.roles.includes("admin") && item.roles.length === 1 && state.role !== "admin") return "";
     const active = state.path === item.path || (item.path === "/clock-correction" && state.path === "/clock-correction/edit");
     const sectionClass = adminSectionOpen && item.roles.length === 1 ? "" : "";
     return `
@@ -129,6 +170,20 @@ function renderNav() {
     `;
   }).join("");
   return `<nav class="nav">${items}</nav>`;
+}
+function renderBottomNav() {
+  const items = navItems.map((item) => {
+    if (item.section) return "";
+    if (item.roles.includes("admin") && item.roles.length === 1 && state.role !== "admin") return "";
+    const active = state.path === item.path || (item.path === "/clock-correction" && state.path === "/clock-correction/edit");
+    return `
+      <button class="bottom-nav-button ${active ? "active" : ""}" data-nav="${item.path}">
+        ${icon(item.icon)}
+        <span>${item.label}</span>
+      </button>
+    `;
+  }).join("");
+  return `<nav class="bottom-nav" aria-label="画面下部ナビゲーション">${items}</nav>`;
 }
 function renderAccount() {
   const name = state.role === "admin" ? "鈴木 美咲" : "田中 花子";
@@ -155,10 +210,7 @@ function renderTopbar(meta) {
         <p>${meta[1]}</p>
       </div>
       <div class="top-actions">
-        <div class="role-toggle" aria-label="ロール切替">
-          <button class="${state.role === "admin" ? "active" : ""}" data-role="admin">管理者</button>
-          <button class="${state.role === "member" ? "active" : ""}" data-role="member">社員</button>
-        </div>
+        <div class="role-pill">${state.role === "admin" ? "管理者" : "社員"}</div>
       </div>
     </header>
   `;
@@ -183,40 +235,48 @@ function renderPage() {
 function renderDashboard() {
   const pending = state.approvals.filter((item) => item.status === "pending").length;
   const missing = state.employees.filter((item) => item.status === "未出勤").length;
-  const workDays = state.history.filter(isAttendanceDay).length;
-  const grantedLeave = state.leaveSummary.annualGranted + state.leaveSummary.carriedOver;
-  const usedLeave = state.leaveSummary.used;
-  const remainingLeave = Math.max(grantedLeave - usedLeave, 0);
   return `
-    <section class="grid cols-2">
-      <article class="card stat-card primary">
+    <section class="dashboard-kpi-section">
+      <div class="dashboard-kpi-header">
         <div>
-          <div class="stat-label">出勤日数</div>
-          <div class="stat-value">${workDays}日</div>
+          <h1>ダッシュボード</h1>
+          <p>${todayLabel()}</p>
         </div>
-        <div class="stat-note">2026年7月 / 有給 1日</div>
-      </article>
-      <article class="card stat-card ok">
-        <div>
-          <div class="stat-label">勤務時間</div>
-          <div class="stat-value">126:40</div>
+        <div class="dashboard-kpi-actions">
+          <button class="button neutral">未出勤</button>
+          <button class="button primary" data-nav="/attendance">${icon("clock")}出勤</button>
         </div>
-        <div class="stat-note">所定 120:00 / 実績集計</div>
-      </article>
-      <article class="card stat-card warn">
-        <div>
-          <div class="stat-label">残業</div>
-          <div class="stat-value">6:40</div>
-        </div>
-        <div class="stat-note">承認待ち 2:00 / 上限内</div>
-      </article>
-      <article class="card stat-card">
-        <div>
-          <div class="stat-label">有給残</div>
-          <div class="stat-value">${remainingLeave}日</div>
-        </div>
-        <div class="stat-note">付与 ${grantedLeave}日 / 使用 ${usedLeave}日</div>
-      </article>
+      </div>
+      <div class="kpi-grid">
+        <article class="kpi-card">
+          <div class="kpi-card-top">
+            <div class="kpi-label">出勤日数</div>
+            <div class="kpi-icon">${icon("calendar")}</div>
+          </div>
+          <div class="kpi-value"><strong>0</strong><span>日</span></div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-card-top">
+            <div class="kpi-label">勤務時間</div>
+            <div class="kpi-icon">${icon("clock")}</div>
+          </div>
+          <div class="kpi-value"><strong>0</strong><span>h</span></div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-card-top">
+            <div class="kpi-label">残業</div>
+          </div>
+          <div class="kpi-value"><strong>0</strong><span>/45h</span></div>
+          <div class="kpi-progress"><span style="width:0%"></span></div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-card-top">
+            <div class="kpi-label">有給残</div>
+          </div>
+          <div class="kpi-value"><strong>17.5</strong><span>日</span></div>
+          <div class="kpi-note">今年度の利用可能な有給残日数</div>
+        </article>
+      </div>
     </section>
     <section class="grid cols-2" style="margin-top:16px">
       <div class="panel">
@@ -770,17 +830,23 @@ function deleteDailyReport(id) {
 document.addEventListener("click", (event) => {
   const target = event.target.closest("button, [data-action]");
   if (!target) return;
+  const loginRole = target.dataset.loginRole;
+  if (loginRole) {
+    state.loginRole = loginRole;
+    render();
+    return;
+  }
+  if (target.dataset.action === "login") {
+    state.role = state.loginRole;
+    state.isLoggedIn = true;
+    setPath("/dashboard");
+    render();
+    return;
+  }
   const nav = target.dataset.nav;
   if (nav) {
     state.sidebarOpen = false;
     setPath(nav);
-    return;
-  }
-  const role = target.dataset.role;
-  if (role) {
-    state.role = role;
-    if (role === "member" && state.path.startsWith("/admin")) setPath("/dashboard");
-    render();
     return;
   }
   const punch = target.dataset.punch;
@@ -837,7 +903,12 @@ document.addEventListener("click", (event) => {
     render();
   }
   if (target.dataset.action === "logout") {
-    setToast("デモ環境のためログアウト処理は省略しています。");
+    state.isLoggedIn = false;
+    state.sidebarOpen = false;
+    state.loginRole = state.role;
+    setPath("/dashboard");
+    render();
+    return;
   }
   if (target.dataset.action === "add-employee") {
     setToast("社員追加フォームを開く想定の操作です。");
@@ -884,6 +955,5 @@ window.setInterval(() => {
 }, 1000);
 if (!window.location.hash) {
   window.location.hash = "/dashboard";
-} else {
-  render();
 }
+render();

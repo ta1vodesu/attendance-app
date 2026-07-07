@@ -86,7 +86,9 @@ const statusClasses = {
 };
 const attendanceTypes = ["出社", "リモート", "直行", "直帰", "フレックス"];
 const state = {
-  role: "admin",
+  isLoggedIn: false,
+  loginRole: "member",
+  role: "member",
   path: "/dashboard",
   sidebarOpen: false,
   attendance: {
