@@ -1,58 +1,66 @@
 function renderShiftRequest() {
   const pending = state.shiftRequests.filter((item) => item.status === "shift_pending").length;
   return `
-    <section class="grid cols-2">
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2>申請フォーム</h2>
-            <p>希望日、区分、時間帯を入力します</p>
-          </div>
-          ${badge("shift_pending", `${pending}件待ち`)}
-        </div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label>希望日</label>
-            <input class="input" type="date" id="shift-date" value="${currentIsoDate()}" />
-          </div>
-          <div class="form-field">
-            <label>シフト区分</label>
-            <select class="select" id="shift-type">
-              <option>通常</option>
-              <option>早番</option>
-              <option>遅番</option>
-              <option>休暇</option>
-              <option>リモート</option>
-            </select>
-          </div>
-          <div class="form-field">
-            <label>開始</label>
-            <input class="input" type="time" id="shift-start" value="09:00" />
-          </div>
-          <div class="form-field">
-            <label>終了</label>
-            <input class="input" type="time" id="shift-end" value="18:00" />
-          </div>
-        </div>
-        <div class="form-field" style="margin-top:14px">
-          <label>申請理由</label>
-          <textarea class="textarea" id="shift-reason" placeholder="例: 顧客訪問に合わせて早番を希望"></textarea>
-        </div>
-        <div class="field-row" style="margin-top:16px">
-          <button class="button primary compact" data-submit-shift>${icon("approvals")}申請する</button>
-        </div>
-      </div>
+    <section class="grid">
+      ${state.shiftFormOpen ? renderShiftRequestForm() : ""}
       <div class="panel">
         <div class="panel-header">
           <div>
             <h2>申請履歴</h2>
             <p>提出済みのシフト申請ステータス</p>
           </div>
-          ${badge("normal", `${state.shiftRequests.length}件`)}
+          <div class="field-row">
+            ${badge("shift_pending", `${pending}件待ち`)}
+            ${state.shiftFormOpen ? "" : `<button class="button primary compact" data-action="open-shift-form">${icon("plus")}申請する</button>`}
+          </div>
         </div>
         ${renderShiftRequestHistory()}
       </div>
     </section>
+  `;
+}
+function renderShiftRequestForm() {
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>申請フォーム</h2>
+          <p>希望日、区分、時間帯を入力します</p>
+        </div>
+        <button class="button neutral compact" data-action="close-shift-form">${icon("close")}閉じる</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>希望日</label>
+          <input class="input" type="date" id="shift-date" value="${currentIsoDate()}" />
+        </div>
+        <div class="form-field">
+          <label>シフト区分</label>
+          <select class="select" id="shift-type">
+            <option>通常</option>
+            <option>早番</option>
+            <option>遅番</option>
+            <option>休暇</option>
+            <option>リモート</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>開始</label>
+          <input class="input" type="time" id="shift-start" value="09:00" />
+        </div>
+        <div class="form-field">
+          <label>終了</label>
+          <input class="input" type="time" id="shift-end" value="18:00" />
+        </div>
+      </div>
+      <div class="form-field" style="margin-top:14px">
+        <label>申請理由</label>
+        <textarea class="textarea" id="shift-reason" placeholder="例: 顧客訪問に合わせて早番を希望"></textarea>
+      </div>
+      <div class="field-row" style="margin-top:16px">
+        <button class="button primary compact" data-submit-shift>${icon("approvals")}申請する</button>
+      </div>
+    </div>
   `;
 }
 function renderShiftRequestHistory() {
@@ -99,35 +107,38 @@ function leaveBalance() {
 function renderLeaveRequest() {
   const { grantedTotal, usedDays, remaining } = leaveBalance();
   return `
-    <section class="grid cols-3">
-      <article class="card stat-card primary">
-        <div>
-          <div class="stat-label">年間付与日数</div>
-          <div class="stat-value">${grantedTotal}日</div>
-        </div>
-        <div class="stat-note">当年 ${state.leaveSummary.annualGranted}日 / 繰越 ${state.leaveSummary.carriedOver}日</div>
-      </article>
-      <article class="card stat-card warn">
-        <div>
-          <div class="stat-label">消化済み</div>
-          <div class="stat-value">${usedDays}日</div>
-        </div>
-        <div class="stat-note">承認済み休暇を反映</div>
-      </article>
-      <article class="card stat-card ok">
-        <div>
-          <div class="stat-label">残日数</div>
-          <div class="stat-value">${remaining}日</div>
-        </div>
-        <div class="stat-note">申請中 ${state.leaveRequests.filter((item) => item.status === "shift_pending").length}件</div>
-      </article>
+    <section class="grid leave-stats-grid">
+      <article class="card stat-card primary"><div class="stat-top"><div class="stat-label">年間付与日数</div><span class="metric-badge time">${icon("calendar")}</span></div><div class="stat-value">${grantedTotal}日</div><div class="stat-note">当年 ${state.leaveSummary.annualGranted}日 / 繰越 ${state.leaveSummary.carriedOver}日</div></article>
+      <article class="card stat-card warn"><div class="stat-top"><div class="stat-label">消化済み</div><span class="metric-badge over">${icon("report")}</span></div><div class="stat-value">${usedDays}日</div><div class="stat-note">承認済み休暇を反映</div></article>
+      <article class="card stat-card ok"><div class="stat-top"><div class="stat-label">残日数</div><span class="metric-badge attend">${icon("approvals")}</span></div><div class="stat-value">${remaining}日</div><div class="stat-note">申請中 ${state.leaveRequests.filter((item) => item.status === "shift_pending").length}件</div></article>
     </section>
-    <section class="panel" style="margin-top:16px">
+    <section class="grid" style="margin-top:16px">
+      ${state.leaveFormOpen ? renderLeaveRequestForm() : ""}
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>申請履歴</h2>
+            <p>提出済みの休暇申請ステータス</p>
+          </div>
+          <div class="field-row">
+            ${badge("normal", `${state.leaveRequests.length}件`)}
+            ${state.leaveFormOpen ? "" : `<button class="button primary compact" data-action="open-leave-form">${icon("plus")}申請する</button>`}
+          </div>
+        </div>
+        ${renderLeaveRequestHistory()}
+      </div>
+    </section>
+  `;
+}
+function renderLeaveRequestForm() {
+  return `
+    <div class="panel">
       <div class="panel-header">
         <div>
           <h2>休暇申請</h2>
           <p>有給休暇や特別休暇の希望を提出します</p>
         </div>
+        <button class="button neutral compact" data-action="close-leave-form">${icon("close")}閉じる</button>
       </div>
       <div class="form-grid">
         <div class="form-field"><label>休暇日</label><input class="input" id="leave-date" type="date" value="${currentIsoDate()}" /></div>
@@ -142,18 +153,8 @@ function renderLeaveRequest() {
         </div>
       </div>
       <div class="form-field" style="margin-top:14px"><label>理由</label><textarea class="textarea" id="leave-reason" placeholder="例: 私用のため"></textarea></div>
-      <div style="margin-top:16px"><button class="button primary compact" data-action="save-leave-request">${icon("approvals")}申請する</button></div>
-    </section>
-    <section class="panel" style="margin-top:16px">
-      <div class="panel-header">
-        <div>
-          <h2>申請履歴</h2>
-          <p>提出済みの休暇申請ステータス</p>
-        </div>
-        ${badge("normal", `${state.leaveRequests.length}件`)}
-      </div>
-      ${renderLeaveRequestHistory()}
-    </section>
+      <div class="field-row" style="margin-top:16px"><button class="button primary compact" data-action="save-leave-request">${icon("approvals")}申請する</button></div>
+    </div>
   `;
 }
 function renderLeaveRequestHistory() {
@@ -189,30 +190,41 @@ function renderLeaveRequestHistory() {
 }
 function renderOvertimeRequest() {
   return `
-    <section class="panel">
+    <section class="grid">
+      ${state.overtimeFormOpen ? renderOvertimeRequestForm() : ""}
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>申請履歴</h2>
+            <p>提出済みの残業申請ステータス</p>
+          </div>
+          <div class="field-row">
+            ${badge("normal", `${state.overtimeRequests.length}件`)}
+            ${state.overtimeFormOpen ? "" : `<button class="button primary compact" data-action="open-overtime-form">${icon("plus")}申請する</button>`}
+          </div>
+        </div>
+        ${renderOvertimeRequestHistory()}
+      </div>
+    </section>
+  `;
+}
+function renderOvertimeRequestForm() {
+  return `
+    <div class="panel">
       <div class="panel-header">
         <div>
           <h2>残業申請</h2>
           <p>予定残業時間と理由を提出します</p>
         </div>
+        <button class="button neutral compact" data-action="close-overtime-form">${icon("close")}閉じる</button>
       </div>
       <div class="form-grid">
         <div class="form-field"><label>対象日</label><input class="input" id="overtime-date" type="date" value="${currentIsoDate()}" /></div>
         <div class="form-field"><label>予定終了</label><input class="input" id="overtime-end" type="time" value="20:00" /></div>
       </div>
       <div class="form-field" style="margin-top:14px"><label>理由</label><textarea class="textarea" id="overtime-reason" placeholder="例: 月次資料作成のため"></textarea></div>
-      <div style="margin-top:16px"><button class="button primary compact" data-action="save-overtime-request">${icon("approvals")}申請する</button></div>
-    </section>
-    <section class="panel" style="margin-top:16px">
-      <div class="panel-header">
-        <div>
-          <h2>申請履歴</h2>
-          <p>提出済みの残業申請ステータス</p>
-        </div>
-        ${badge("normal", `${state.overtimeRequests.length}件`)}
-      </div>
-      ${renderOvertimeRequestHistory()}
-    </section>
+      <div class="field-row" style="margin-top:16px"><button class="button primary compact" data-action="save-overtime-request">${icon("approvals")}申請する</button></div>
+    </div>
   `;
 }
 function renderOvertimeRequestHistory() {
@@ -312,49 +324,38 @@ function renderCalendar() {
     </section>
   `;
 }
+function dailyReportStats() {
+  const reports = state.dailyReports;
+  const monthPrefix = toDisplayDate(currentIsoDate()).slice(0, 8); // "2026/07/"
+  const monthlyCount = reports.filter((item) => String(item.date).startsWith(monthPrefix)).length;
+  const lastUpdated = reports.length ? reports[0].date : "-";
+  const scored = reports.filter((item) => typeof item.achievement === "number" && !Number.isNaN(item.achievement));
+  const avgAchievement = scored.length
+    ? `${Math.round(scored.reduce((total, item) => total + item.achievement, 0) / scored.length)}%`
+    : "-";
+  return { monthlyCount, lastUpdated, avgAchievement };
+}
 function renderDailyReport() {
-  const editing = state.dailyReports.find((item) => item.id === state.reportEditingId);
-  const formDate = editing ? editing.date.replace(/\//g, "-") : currentIsoDate();
+  const stats = dailyReportStats();
+  const [year, month] = currentIsoDate().split("-");
   return `
-    <section class="grid cols-2">
-      <div class="panel">
-        <div class="panel-header">
-          <div>
-            <h2>${editing ? "日報編集" : "日報作成"}</h2>
-            <p>業務内容と次回予定を記録します</p>
-          </div>
-          ${editing ? badge("correction_pending", "編集中") : ""}
-        </div>
-        <div class="form-grid">
-          <div class="form-field">
-            <label>日付</label>
-            <input class="input" type="date" id="report-date" value="${formDate}" />
-          </div>
-          <div class="form-field">
-            <label>件名</label>
-            <input class="input" id="report-title" value="${editing ? escapeHtml(editing.title) : ""}" placeholder="例: 顧客フォロー" />
-          </div>
-        </div>
-        <div class="form-field" style="margin-top:14px">
-          <label>業務内容</label>
-          <textarea class="textarea" id="report-body" placeholder="本日の実施内容">${editing ? escapeHtml(editing.body) : ""}</textarea>
-        </div>
-        <div class="form-field" style="margin-top:14px">
-          <label>次回予定</label>
-          <textarea class="textarea" id="report-next" placeholder="明日以降の予定">${editing ? escapeHtml(editing.next) : ""}</textarea>
-        </div>
-        <div class="field-row" style="margin-top:16px">
-          <button class="button primary" data-save-report>${icon("check")}${editing ? "更新する" : "作成する"}</button>
-          ${editing ? `<button class="button neutral" data-cancel-report>${icon("close")}キャンセル</button>` : ""}
-        </div>
-      </div>
+    <section class="grid report-stats-grid">
+      <article class="card stat-card ok"><div class="stat-top"><div class="stat-label">月別日報数</div><span class="metric-badge attend">${icon("approvals")}</span></div><div class="stat-value">${stats.monthlyCount}件</div><div class="stat-note">${year}年${Number(month)}月</div></article>
+      <article class="card stat-card primary"><div class="stat-top"><div class="stat-label">最終更新日</div><span class="metric-badge time">${icon("history")}</span></div><div class="stat-value">${escapeHtml(stats.lastUpdated)}</div><div class="stat-note">直近に作成した日報</div></article>
+      <article class="card stat-card warn"><div class="stat-top"><div class="stat-label">自己達成度平均</div><span class="metric-badge over">${icon("report")}</span></div><div class="stat-value">${stats.avgAchievement}</div><div class="stat-note">記録済み日報の平均</div></article>
+    </section>
+    <section class="grid" style="margin-top:16px">
+      ${state.dailyReportFormOpen ? renderDailyReportForm() : ""}
       <div class="panel">
         <div class="panel-header">
           <div>
             <h2>日報一覧</h2>
             <p>作成済みの日報を編集または削除できます</p>
           </div>
-          ${badge("normal", `${state.dailyReports.length}件`)}
+          <div class="field-row">
+            ${badge("normal", `${state.dailyReports.length}件`)}
+            ${state.dailyReportFormOpen ? "" : `<button class="button primary compact" data-action="open-report-form">${icon("plus")}作成する</button>`}
+          </div>
         </div>
         <div class="report-list">
           ${state.dailyReports.length ? state.dailyReports.map(renderDailyReportItem).join("") : '<div class="empty">日報はまだありません</div>'}
@@ -363,17 +364,66 @@ function renderDailyReport() {
     </section>
   `;
 }
+function renderDailyReportForm() {
+  const editing = state.dailyReports.find((item) => String(item.id) === String(state.reportEditingId));
+  const formDate = editing ? editing.date.replace(/\//g, "-") : currentIsoDate();
+  const currentAchievement = editing && typeof editing.achievement === "number" ? editing.achievement : 75;
+  const segments = [0, 25, 50, 75, 100]
+    .map((value) => `<button type="button" class="achievement-seg ${value <= currentAchievement ? "filled" : ""} ${value === currentAchievement ? "active" : ""}" data-achievement="${value}">${value}%</button>`)
+    .join("");
+  return `
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>${editing ? "日報編集" : "日報作成"}</h2>
+          <p>業務内容と次回予定を記録します</p>
+        </div>
+        <div class="field-row">
+          ${editing ? badge("correction_pending", "編集中") : ""}
+          <button class="button neutral compact" data-action="close-report-form">${icon("close")}閉じる</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>日付</label>
+          <input class="input" type="date" id="report-date" value="${formDate}" />
+        </div>
+        <div class="form-field">
+          <label>件名</label>
+          <input class="input" id="report-title" value="${editing ? escapeHtml(editing.title) : ""}" placeholder="例: 顧客フォロー" />
+        </div>
+      </div>
+      <div class="form-field" style="margin-top:14px">
+        <label>業務内容</label>
+        <textarea class="textarea" id="report-body" placeholder="本日の実施内容">${editing ? escapeHtml(editing.body) : ""}</textarea>
+      </div>
+      <div class="form-field" style="margin-top:14px">
+        <label>次回予定</label>
+        <textarea class="textarea" id="report-next" placeholder="明日以降の予定">${editing ? escapeHtml(editing.next) : ""}</textarea>
+      </div>
+      <div class="form-field" style="margin-top:14px">
+        <label>今日の達成度（<span id="achievement-label">${currentAchievement}%</span>）</label>
+        <input type="hidden" id="report-achievement" value="${currentAchievement}" />
+        <div class="achievement-meter" role="group" aria-label="今日の達成度">${segments}</div>
+      </div>
+      <div class="field-row" style="margin-top:16px">
+        <button class="button primary" data-save-report>${icon("check")}${editing ? "更新する" : "送信する"}</button>
+      </div>
+    </div>
+  `;
+}
 function renderDailyReportItem(report) {
+  const achievement = typeof report.achievement === "number" ? `${report.achievement}%` : "-";
   return `
     <article class="item">
       <div class="item-row">
         <div>
           <div class="item-title">${escapeHtml(report.title)}</div>
-          <div class="item-meta">${escapeHtml(report.date)}</div>
+          <div class="item-meta">${escapeHtml(report.date)}・達成度 ${achievement}</div>
         </div>
         <div class="field-row">
           <button class="button neutral" data-edit-report="${report.id}">${icon("edit")}編集</button>
-          <button class="button danger" data-delete-report="${report.id}">${icon("trash")}削除</button>
+          <button class="button reject" data-delete-report="${report.id}">${icon("trash")}削除</button>
         </div>
       </div>
       <div class="item-meta">${escapeHtml(report.body)}</div>

@@ -844,11 +844,15 @@ tr:last-child td {
 .dot.warn {
   background: var(--warn);
 }
-.calendar-stats-grid {
+.calendar-stats-grid,
+.report-stats-grid,
+.leave-stats-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-/* カレンダー集計カードは3枚とも同じ縦構造で揃える（上段=ラベル+バッジ / 中央=数値 / 下=補足） */
-.calendar-stats-grid .stat-card {
+/* 集計カードは3枚とも同じ縦構造で揃える（上段=ラベル+バッジ / 中央=数値 / 下=補足） */
+.calendar-stats-grid .stat-card,
+.report-stats-grid .stat-card,
+.leave-stats-grid .stat-card {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
@@ -856,39 +860,62 @@ tr:last-child td {
   gap: 10px;
   min-height: 132px;
 }
-.calendar-stats-grid .stat-top {
+.calendar-stats-grid .stat-top,
+.report-stats-grid .stat-top,
+.leave-stats-grid .stat-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.calendar-stats-grid .stat-value {
+.calendar-stats-grid .stat-value,
+.report-stats-grid .stat-value,
+.leave-stats-grid .stat-value {
   margin-top: 0;
 }
-.calendar-stats-grid .stat-note {
+.calendar-stats-grid .stat-note,
+.report-stats-grid .stat-note,
+.leave-stats-grid .stat-note {
   margin-top: auto;
   text-align: left;
 }
-/* 3カードの横軸を揃える: ラベル/バッジは上端、数値/注記は下端に固定 */
-.calendar-stats-grid .stat-card {
-  align-items: stretch;
-}
-.calendar-stats-grid .stat-card > div:first-child {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-.calendar-stats-grid .stat-card .stat-value {
-  margin-top: 8px;
-  line-height: 1.2;
-}
-.calendar-stats-grid .stat-corner {
-  justify-content: space-between;
+@media (max-width: 620px) {
+  .report-stats-grid,
+  .leave-stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 620px) {
   .calendar-stats-grid {
     grid-template-columns: 1fr;
   }
+}
+/* 達成度メーター（25%刻み・左から右へ塗りつぶし） */
+.achievement-meter {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.achievement-seg {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 13px;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.achievement-seg:hover {
+  border-color: var(--line-strong);
+}
+.achievement-seg.filled {
+  color: #ffffff;
+  border-color: var(--ok);
+  background: var(--ok);
+}
+.achievement-seg.active {
+  box-shadow: 0 0 0 2px var(--ok-soft);
 }
 .calendar-nav {
   display: flex;

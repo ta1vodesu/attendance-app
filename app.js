@@ -442,6 +442,10 @@ async function loadPageDataSafely() {
     await loadCalendarMonthSafely();
     render();
   }
+  if (state.path === "/daily-report") {
+    await loadDailyReportsSafely();
+    render();
+  }
   if (state.path === "/admin/shifts") {
     await loadAdminShiftsSafely();
     render();
@@ -896,6 +900,7 @@ function renderPunchHistoryTable() {
   `;
 }
 function renderClockCorrection() {
+  const applyTarget = state.history.find((row) => row.status === "missing_clock_out") || state.history[0];
   return `
     <section class="panel">
       <div class="toolbar">
@@ -912,6 +917,7 @@ function renderClockCorrection() {
             <option>2026年5月</option>
           </select>
           <button class="button neutral">${icon("download")}CSV</button>
+          ${applyTarget ? `<button class="button primary compact" data-edit="${applyTarget.id}">${icon("approvals")}申請</button>` : ""}
         </div>
       </div>
       <div class="table-wrap">
@@ -1502,6 +1508,7 @@ async function submitShiftRequest() {
 
   if (!canPersistShifts()) {
     addLocalShiftRequest({ requestDate, shift, start, end, reason });
+    state.shiftFormOpen = false;
     shiftPendingToast();
     return;
   }
@@ -1520,6 +1527,7 @@ async function submitShiftRequest() {
   try {
     await window.supabaseAuth.createShift(payload);
     await loadShifts();
+    state.shiftFormOpen = false;
     shiftPendingToast();
   } catch (error) {
     console.error(error);
@@ -1547,6 +1555,7 @@ function submitLeaveRequest() {
     },
     ...state.leaveRequests
   ];
+  state.leaveFormOpen = false;
   setToast("休暇申請を提出しました。");
 }
 function overtimeHours(endTime) {
@@ -1576,31 +1585,117 @@ function submitOvertimeRequest() {
     },
     ...state.overtimeRequests
   ];
+  state.overtimeFormOpen = false;
   setToast("残業申請を提出しました。");
 }
-function saveDailyReport() {
+function reportRowToItem(row) {
+  return {
+    id: row.id,
+    date: toDisplayDate(row.report_date),
+    title: row.title,
+    body: row.body,
+    next: row.next_plan || "-",
+    achievement: typeof row.achievement === "number" ? row.achievement : null
+  };
+}
+function canPersistReports() {
+  return Boolean(
+    state.currentUser?.id &&
+    window.supabaseAuth?.isConfigured() &&
+    window.supabaseAuth?.listDailyReports
+  );
+}
+async function loadDailyReports() {
+  if (!canPersistReports()) return;
+  const rows = await window.supabaseAuth.listDailyReports();
+  state.dailyReports = rows.map(reportRowToItem);
+}
+async function loadDailyReportsSafely() {
+  try {
+    await loadDailyReports();
+  } catch (error) {
+    console.error(error);
+    state.toast = "日報の取得に失敗しました。";
+  }
+}
+function reportErrorMessage(error) {
+  if (error?.code === "23505") {
+    return "この日付の日報は既に作成されています。一覧から編集してください。";
+  }
+  return error?.message || "日報の保存に失敗しました。";
+}
+async function saveDailyReport() {
   const date = document.querySelector("#report-date").value;
   const title = document.querySelector("#report-title").value.trim();
   const body = document.querySelector("#report-body").value.trim();
   const next = document.querySelector("#report-next").value.trim();
+  const achievement = Number(document.querySelector("#report-achievement")?.value ?? 80);
   if (!date || !title || !body) {
     setToast("日付、件名、業務内容を入力してください。");
     return;
   }
-  const payload = { date: toDisplayDate(date), title, body, next: next || "-" };
-  if (state.reportEditingId) {
-    state.dailyReports = state.dailyReports.map((item) => item.id === state.reportEditingId ? { ...item, ...payload } : item);
-    state.reportEditingId = null;
-    setToast("日報を更新しました。");
+  const editingId = state.reportEditingId;
+
+  // 送信時に今日の達成度を示して再確認する
+  if (!window.confirm(`今日の達成度: ${achievement}%\nこの内容で日報を${editingId ? "更新" : "送信"}しますか？`)) return;
+
+  if (!canPersistReports()) {
+    const localPayload = { date: toDisplayDate(date), title, body, next: next || "-", achievement };
+    if (editingId) {
+      state.dailyReports = state.dailyReports.map((item) => String(item.id) === String(editingId) ? { ...item, ...localPayload } : item);
+      state.reportEditingId = null;
+      state.dailyReportFormOpen = false;
+      pushNotification("日報を更新しました。");
+      return;
+    }
+    state.dailyReports = [{ id: nextNumericId(state.dailyReports), ...localPayload }, ...state.dailyReports];
+    state.dailyReportFormOpen = false;
+    pushNotification("日報を送信しました。");
     return;
   }
-  state.dailyReports = [{ id: nextNumericId(state.dailyReports), ...payload }, ...state.dailyReports];
-  setToast("日報を作成しました。");
+
+  const payload = {
+    report_date: date,
+    title,
+    body,
+    next_plan: next || null,
+    achievement,
+    status: "submitted"
+  };
+  try {
+    if (editingId) {
+      await window.supabaseAuth.updateDailyReport(editingId, payload);
+    } else {
+      await window.supabaseAuth.createDailyReport({ ...payload, user_id: state.currentUser.id });
+    }
+    await loadDailyReports();
+    state.reportEditingId = null;
+    state.dailyReportFormOpen = false;
+    pushNotification(editingId ? "日報を更新しました。" : "日報を送信しました。");
+  } catch (error) {
+    console.error(error);
+    setToast(reportErrorMessage(error));
+  }
 }
-function deleteDailyReport(id) {
-  state.dailyReports = state.dailyReports.filter((item) => item.id !== id);
-  if (state.reportEditingId === id) state.reportEditingId = null;
-  setToast("日報を削除しました。");
+async function deleteDailyReport(id) {
+  const targetItem = state.dailyReports.find((item) => String(item.id) === String(id));
+  if (!targetItem) return;
+  if (!window.confirm(`日報を削除しますか？（${targetItem.date} ${targetItem.title}）`)) return;
+
+  if (canPersistReports() && window.supabaseAuth?.deleteDailyReport) {
+    try {
+      await window.supabaseAuth.deleteDailyReport(targetItem.id);
+      await loadDailyReports();
+    } catch (error) {
+      console.error(error);
+      setToast(error?.message || "日報の削除に失敗しました。");
+      return;
+    }
+  } else {
+    state.dailyReports = state.dailyReports.filter((item) => String(item.id) !== String(id));
+  }
+  if (String(state.reportEditingId) === String(id)) state.reportEditingId = null;
+  pushNotification("日報を削除しました。");
 }
 function authErrorMessage(error) {
   const message = error?.message || "";
@@ -1726,6 +1821,36 @@ document.addEventListener("click", async (event) => {
     submitCorrection(correctionId);
     return;
   }
+  if (target.dataset.action === "open-shift-form") {
+    state.shiftFormOpen = true;
+    render();
+    return;
+  }
+  if (target.dataset.action === "close-shift-form") {
+    state.shiftFormOpen = false;
+    render();
+    return;
+  }
+  if (target.dataset.action === "open-leave-form") {
+    state.leaveFormOpen = true;
+    render();
+    return;
+  }
+  if (target.dataset.action === "close-leave-form") {
+    state.leaveFormOpen = false;
+    render();
+    return;
+  }
+  if (target.dataset.action === "open-overtime-form") {
+    state.overtimeFormOpen = true;
+    render();
+    return;
+  }
+  if (target.dataset.action === "close-overtime-form") {
+    state.overtimeFormOpen = false;
+    render();
+    return;
+  }
   if ("submitShift" in target.dataset) {
     await submitShiftRequest();
     return;
@@ -1735,23 +1860,53 @@ document.addEventListener("click", async (event) => {
     await cancelShiftRequest(cancelShiftId);
     return;
   }
+  if ("achievement" in target.dataset) {
+    const value = Number(target.dataset.achievement);
+    const hidden = document.querySelector("#report-achievement");
+    if (hidden) hidden.value = String(value);
+    document.querySelectorAll(".achievement-seg").forEach((seg) => {
+      const segValue = Number(seg.dataset.achievement);
+      seg.classList.toggle("filled", segValue <= value);
+      seg.classList.toggle("active", segValue === value);
+    });
+    const label = document.querySelector("#achievement-label");
+    if (label) label.textContent = `${value}%`;
+    return;
+  }
+  if (target.dataset.action === "open-report-form") {
+    state.reportEditingId = null;
+    state.dailyReportFormOpen = true;
+    render();
+    return;
+  }
+  if (target.dataset.action === "close-report-form") {
+    state.reportEditingId = null;
+    state.dailyReportFormOpen = false;
+    render();
+    return;
+  }
   if ("saveReport" in target.dataset) {
-    saveDailyReport();
+    await saveDailyReport();
     return;
   }
   const reportEditId = target.dataset.editReport;
   if (reportEditId) {
-    state.reportEditingId = Number(reportEditId);
+    const editTarget = state.dailyReports.find((item) => String(item.id) === String(reportEditId));
+    if (!editTarget) return;
+    if (!window.confirm(`日報を編集しますか？（${editTarget.date} ${editTarget.title}）`)) return;
+    state.reportEditingId = reportEditId;
+    state.dailyReportFormOpen = true;
     render();
     return;
   }
   const reportDeleteId = target.dataset.deleteReport;
   if (reportDeleteId) {
-    deleteDailyReport(Number(reportDeleteId));
+    await deleteDailyReport(reportDeleteId);
     return;
   }
   if ("cancelReport" in target.dataset) {
     state.reportEditingId = null;
+    state.dailyReportFormOpen = false;
     render();
     return;
   }

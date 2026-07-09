@@ -103,6 +103,9 @@ const state = {
   path: "/dashboard",
   sidebarOpen: false,
   notifications: [],
+  shiftFormOpen: false,
+  leaveFormOpen: false,
+  overtimeFormOpen: false,
   punchPending: false,
   attendance: {
     id: null,
@@ -160,10 +163,11 @@ const state = {
     { id: 2, requestDate: "2026/07/02", endTime: "19:00", hours: "1:00", reason: "顧客対応", submittedAt: "2026/07/01", status: "shift_approved" }
   ],
   dailyReports: [
-    { id: 1, date: "2026/07/06", title: "既存顧客フォロー", body: "A社の契約更新に向けて利用状況を整理し、次回提案の論点をまとめました。", next: "見積条件を確認して提案資料を更新する" },
-    { id: 2, date: "2026/07/03", title: "問い合わせ対応", body: "新規問い合わせ 5 件に対応し、うち 2 件を商談化しました。", next: "商談日程の確定と事前ヒアリング" }
+    { id: 1, date: "2026/07/06", title: "既存顧客フォロー", body: "A社の契約更新に向けて利用状況を整理し、次回提案の論点をまとめました。", next: "見積条件を確認して提案資料を更新する", achievement: 80 },
+    { id: 2, date: "2026/07/03", title: "問い合わせ対応", body: "新規問い合わせ 5 件に対応し、うち 2 件を商談化しました。", next: "商談日程の確定と事前ヒアリング", achievement: 90 }
   ],
   reportEditingId: null,
+  dailyReportFormOpen: false,
   employees: [
     { name: "田中 花子", department: "営業部", role: "member", status: "勤務中", today: "09:05 -", month: "126:40" },
     { name: "佐藤 健", department: "開発部", role: "member", status: "未出勤", today: "-", month: "118:20" },

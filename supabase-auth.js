@@ -263,6 +263,66 @@
     if (error) throw error;
   }
 
+  const dailyReportColumns = [
+    "id",
+    "user_id",
+    "report_date",
+    "title",
+    "body",
+    "next_plan",
+    "achievement",
+    "status",
+    "created_at",
+    "updated_at"
+  ].join(",");
+
+  async function listDailyReports() {
+    if (!client) return [];
+    // RLS により member は自分の日報のみ、admin は全員の日報が返る
+    const { data, error } = await client
+      .from("daily_reports")
+      .select(dailyReportColumns)
+      .order("report_date", { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function createDailyReport(payload) {
+    if (!client) throw new Error(initErrorMessage() || "Supabaseクライアントを初期化できませんでした。");
+    const { data, error } = await client
+      .from("daily_reports")
+      .insert(payload)
+      .select(dailyReportColumns)
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function updateDailyReport(id, payload) {
+    if (!client) throw new Error(initErrorMessage() || "Supabaseクライアントを初期化できませんでした。");
+    const { data, error } = await client
+      .from("daily_reports")
+      .update(payload)
+      .eq("id", id)
+      .select(dailyReportColumns)
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteDailyReportRow(id) {
+    if (!client) throw new Error(initErrorMessage() || "Supabaseクライアントを初期化できませんでした。");
+    const { error } = await client
+      .from("daily_reports")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+  }
+
   function onAuthStateChange(callback) {
     if (!client) return { unsubscribe() {} };
     const { data } = client.auth.onAuthStateChange(callback);
@@ -286,6 +346,10 @@
     createShift,
     updateShift,
     deleteShift,
+    listDailyReports,
+    createDailyReport,
+    updateDailyReport,
+    deleteDailyReport: deleteDailyReportRow,
     onAuthStateChange
   };
 })();
