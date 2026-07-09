@@ -72,6 +72,15 @@ function notifyShiftStatusChanges(rows) {
       .forEach((row) => {
         pushNotification(`シフト申請（希望日 ${toDisplayDate(row.request_date)}）が却下されました。`);
       });
+    ownRows
+      .filter((row) => {
+        const previous = snapshot[row.id];
+        return previous && previous !== "on_hold" && row.status === "on_hold";
+      })
+      .forEach((row) => {
+        const comment = row.review_comment ? `コメント: ${row.review_comment}` : "";
+        pushNotification(`シフト申請（希望日 ${toDisplayDate(row.request_date)}）が保留になりました。${comment}`);
+      });
   }
   saveShiftStatusSnapshot(ownRows);
 }

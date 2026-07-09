@@ -197,6 +197,7 @@
     "status",
     "reviewed_by",
     "reviewed_at",
+    "review_comment",
     "submitted_at",
     "created_at",
     "updated_at"

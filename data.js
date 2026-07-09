@@ -18,7 +18,8 @@ const icons = {
   check: '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
   chevronLeft: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
-  chevronRight: '<svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>'
+  chevronRight: '<svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>'
 };
 const navItems = [
   { path: "/dashboard", label: "ダッシュボード", icon: "dashboard", roles: ["admin", "member"] },
@@ -103,6 +104,10 @@ const state = {
   path: "/dashboard",
   sidebarOpen: false,
   notifications: [],
+  attendanceLoadError: false,
+  attendanceLoading: false,
+  shiftsLoaded: false,
+  reportsLoaded: false,
   shiftFormOpen: false,
   leaveFormOpen: false,
   overtimeFormOpen: false,

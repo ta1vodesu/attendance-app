@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "dev": "python3 -m http.server 3001 --bind 127.0.0.1"
+    "dev": "python3 -m http.server 3001 --bind 127.0.0.1",
+    "build": "rm -rf dist && mkdir -p dist && cp -r index.html login styles.css *.js dist/ && mkdir -p dist/node_modules/@supabase/supabase-js/dist/umd && cp node_modules/@supabase/supabase-js/dist/umd/supabase.js dist/node_modules/@supabase/supabase-js/dist/umd/"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.0"

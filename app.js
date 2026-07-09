@@ -68,6 +68,8 @@ function clearAuthState() {
   state.loginRole = "member";
   state.currentUser = null;
   state.notifications = [];
+  state.shiftsLoaded = false;
+  state.reportsLoaded = false;
 }
 function setAuthPending(pending) {
   state.authPending = pending;
@@ -258,13 +260,34 @@ async function loadTodayAttendance() {
   return record;
 }
 async function loadTodayAttendanceSafely() {
+  state.attendanceLoading = true;
+  render();
   try {
-    return await loadTodayAttendance();
+    const record = await loadTodayAttendance();
+    state.attendanceLoadError = false;
+    return record;
   } catch (error) {
     console.error(error);
+    state.attendanceLoadError = true;
     state.toast = "本日の勤怠情報を取得できませんでした。";
     return null;
+  } finally {
+    state.attendanceLoading = false;
+    render();
   }
+}
+function renderAttendanceTimeline() {
+  if (state.attendanceLoading) {
+    return `<div class="empty loading-state"><span class="loading-spinner">${icon("refresh")}</span>ローディング中</div>`;
+  }
+  if (state.attendanceLoadError) return '<div class="empty">エラーが起きました</div>';
+  if (!state.attendance.logs.length) return '<div class="empty">データが読み込めません</div>';
+  return state.attendance.logs.map((item) => `
+    <div class="timeline-item">
+      <div class="timeline-time">${item.time}</div>
+      <div class="timeline-label">${item.label}</div>
+    </div>
+  `).join("");
 }
 function shiftStatusToApp(status) {
   if (status === "approved") return "shift_approved";
@@ -286,7 +309,8 @@ function shiftRowToItem(shift) {
     time: formatShiftTime(shift),
     reason: shift.reason,
     submittedAt: shift.submitted_at ? toDisplayDate(currentIsoDate(shift.submitted_at)) : "",
-    status: shiftStatusToApp(shift.status)
+    status: shiftStatusToApp(shift.status),
+    comment: shift.review_comment || ""
   };
 }
 function canPersistShifts() {
@@ -302,6 +326,7 @@ async function loadShifts() {
   const rows = await window.supabaseAuth.listShifts();
   notifyShiftStatusChanges(rows);
   state.shiftRequests = rows.map(shiftRowToItem);
+  state.shiftsLoaded = true;
 }
 async function loadShiftsSafely() {
   try {
@@ -322,7 +347,8 @@ function adminShiftRowToItem(shift) {
     time: formatShiftTime(shift),
     reason: shift.reason,
     submittedAt: shift.submitted_at ? toDisplayDate(currentIsoDate(shift.submitted_at)) : "",
-    status: shiftStatusToApp(shift.status)
+    status: shiftStatusToApp(shift.status),
+    comment: shift.review_comment || ""
   };
 }
 function canManageShifts() {
@@ -735,12 +761,7 @@ function renderDashboard() {
           ${badge(state.attendance.status)}
         </div>
         <div class="time-line">
-          ${state.attendance.logs.map((item) => `
-            <div class="timeline-item">
-              <div class="timeline-time">${item.time}</div>
-              <div class="timeline-label">${item.label}</div>
-            </div>
-          `).join("")}
+          ${renderAttendanceTimeline()}
         </div>
         <div style="margin-top:16px">
           <button class="button primary" data-nav="/attendance">${icon("clock")}打刻画面へ</button>
@@ -850,12 +871,7 @@ function renderAttendance() {
         </div>
       </div>
       <div class="time-line">
-        ${state.attendance.logs.length ? state.attendance.logs.map((item) => `
-          <div class="timeline-item">
-            <div class="timeline-time">${item.time}</div>
-            <div class="timeline-label">${item.label}</div>
-          </div>
-        `).join("") : '<div class="empty">本日の打刻はまだありません</div>'}
+        ${renderAttendanceTimeline()}
       </div>
     </section>
     <section class="panel" style="margin-top:16px">
@@ -1123,6 +1139,7 @@ function renderAdminShiftItem(item) {
       </div>
       <div class="item-meta">${escapeHtml(item.reason)}</div>
       <div class="item-meta">申請日: ${escapeHtml(item.submittedAt)}</div>
+      ${item.status === "shift_on_hold" && item.comment ? `<div class="item-meta">保留コメント: ${escapeHtml(item.comment)}</div>` : ""}
       ${item.status === "shift_pending" || item.status === "shift_on_hold" ? `
         <div class="field-row">
           <button class="button approve" data-shift-decision="approved" data-shift-id="${item.id}" ${pendingThis ? "disabled" : ""}>${icon("check")}承認</button>
@@ -1141,10 +1158,21 @@ async function decideAdminShift(id, decision) {
   if (!decidable || item.status === shiftDecisionStatuses[decision]) return;
   const label = shiftDecisionLabels[decision];
   if (!label) return;
-  if (!window.confirm(`本当に${label}しますか？`)) return;
+  let reviewComment = "";
+  if (decision === "on_hold") {
+    const input = window.prompt("申請者へのコメントを入力してください（任意）", item.comment || "");
+    if (input === null) return;
+    reviewComment = input.trim();
+    const commentLine = reviewComment ? `コメント: ${reviewComment}\n` : "";
+    if (!window.confirm(`${commentLine}本当に保留にしますか？`)) return;
+  } else if (!window.confirm(`本当に${label}しますか？`)) {
+    return;
+  }
 
   if (!canManageShifts()) {
-    state.adminShifts = state.adminShifts.map((shift) => shift.id === id ? { ...shift, status: shiftDecisionStatuses[decision] } : shift);
+    state.adminShifts = state.adminShifts.map((shift) => shift.id === id
+      ? { ...shift, status: shiftDecisionStatuses[decision], ...(decision === "on_hold" ? { comment: reviewComment } : {}) }
+      : shift);
     setToast(`シフト申請を${label}しました。`);
     return;
   }
@@ -1155,7 +1183,8 @@ async function decideAdminShift(id, decision) {
     await window.supabaseAuth.updateShift(id, {
       status: decision,
       reviewed_by: state.currentUser.id,
-      reviewed_at: new Date().toISOString()
+      reviewed_at: new Date().toISOString(),
+      ...(decision === "on_hold" ? { review_comment: reviewComment || null } : {})
     });
     await loadAdminShifts();
     setToast(`シフト申請を${label}しました。`);
@@ -1609,6 +1638,7 @@ async function loadDailyReports() {
   if (!canPersistReports()) return;
   const rows = await window.supabaseAuth.listDailyReports();
   state.dailyReports = rows.map(reportRowToItem);
+  state.reportsLoaded = true;
 }
 async function loadDailyReportsSafely() {
   try {

@@ -1,5 +1,9 @@
+function renderLoadingBlock(text) {
+  return `<div class="empty loading-block"><span class="spinner" aria-hidden="true"></span>${text || "読み込み中…"}</div>`;
+}
 function renderShiftRequest() {
-  const pending = state.shiftRequests.filter((item) => item.status === "shift_pending").length;
+  const loading = typeof canPersistShifts === "function" && canPersistShifts() && !state.shiftsLoaded;
+  const pending = loading ? 0 : state.shiftRequests.filter((item) => item.status === "shift_pending").length;
   return `
     <section class="grid">
       ${state.shiftFormOpen ? renderShiftRequestForm() : ""}
@@ -10,11 +14,11 @@ function renderShiftRequest() {
             <p>提出済みのシフト申請ステータス</p>
           </div>
           <div class="field-row">
-            ${badge("shift_pending", `${pending}件待ち`)}
-            ${state.shiftFormOpen ? "" : `<button class="button primary compact" data-action="open-shift-form">${icon("plus")}申請する</button>`}
+            ${badge("shift_pending", loading ? "読み込み中" : `${pending}件待ち`)}
+            ${state.shiftFormOpen ? "" : `<button class="button primary compact" data-action="open-shift-form">${icon("plus")}シフト申請</button>`}
           </div>
         </div>
-        ${renderShiftRequestHistory()}
+        ${loading ? renderLoadingBlock() : renderShiftRequestHistory()}
       </div>
     </section>
   `;
@@ -58,7 +62,7 @@ function renderShiftRequestForm() {
         <textarea class="textarea" id="shift-reason" placeholder="例: 顧客訪問に合わせて早番を希望"></textarea>
       </div>
       <div class="field-row" style="margin-top:16px">
-        <button class="button primary compact" data-submit-shift>${icon("approvals")}申請する</button>
+        <button class="button primary compact" data-submit-shift>${icon("approvals")}シフト申請</button>
       </div>
     </div>
   `;
@@ -87,7 +91,7 @@ function renderShiftRequestHistory() {
               <td>${escapeHtml(item.time)}</td>
               <td>${escapeHtml(item.reason)}</td>
               <td>${escapeHtml(item.submittedAt)}</td>
-              <td>${badge(item.status)}</td>
+              <td>${badge(item.status)}${item.status === "shift_on_hold" && item.comment ? `<div class="item-meta" style="margin-top:4px">${escapeHtml(item.comment)}</div>` : ""}</td>
               <td>${item.status === "shift_pending" ? `<button class="button danger compact" data-cancel-shift="${escapeHtml(String(item.id))}">キャンセル</button>` : ""}</td>
             </tr>
           `).join("")}
@@ -122,7 +126,7 @@ function renderLeaveRequest() {
           </div>
           <div class="field-row">
             ${badge("normal", `${state.leaveRequests.length}件`)}
-            ${state.leaveFormOpen ? "" : `<button class="button primary compact" data-action="open-leave-form">${icon("plus")}申請する</button>`}
+            ${state.leaveFormOpen ? "" : `<button class="button primary compact" data-action="open-leave-form">${icon("plus")}休暇申請</button>`}
           </div>
         </div>
         ${renderLeaveRequestHistory()}
@@ -153,7 +157,7 @@ function renderLeaveRequestForm() {
         </div>
       </div>
       <div class="form-field" style="margin-top:14px"><label>理由</label><textarea class="textarea" id="leave-reason" placeholder="例: 私用のため"></textarea></div>
-      <div class="field-row" style="margin-top:16px"><button class="button primary compact" data-action="save-leave-request">${icon("approvals")}申請する</button></div>
+      <div class="field-row" style="margin-top:16px"><button class="button primary compact" data-action="save-leave-request">${icon("approvals")}休暇申請</button></div>
     </div>
   `;
 }
@@ -200,7 +204,7 @@ function renderOvertimeRequest() {
           </div>
           <div class="field-row">
             ${badge("normal", `${state.overtimeRequests.length}件`)}
-            ${state.overtimeFormOpen ? "" : `<button class="button primary compact" data-action="open-overtime-form">${icon("plus")}申請する</button>`}
+            ${state.overtimeFormOpen ? "" : `<button class="button primary compact" data-action="open-overtime-form">${icon("plus")}残業申請</button>`}
           </div>
         </div>
         ${renderOvertimeRequestHistory()}
@@ -223,7 +227,7 @@ function renderOvertimeRequestForm() {
         <div class="form-field"><label>予定終了</label><input class="input" id="overtime-end" type="time" value="20:00" /></div>
       </div>
       <div class="form-field" style="margin-top:14px"><label>理由</label><textarea class="textarea" id="overtime-reason" placeholder="例: 月次資料作成のため"></textarea></div>
-      <div class="field-row" style="margin-top:16px"><button class="button primary compact" data-action="save-overtime-request">${icon("approvals")}申請する</button></div>
+      <div class="field-row" style="margin-top:16px"><button class="button primary compact" data-action="save-overtime-request">${icon("approvals")}残業申請</button></div>
     </div>
   `;
 }
@@ -336,11 +340,12 @@ function dailyReportStats() {
   return { monthlyCount, lastUpdated, avgAchievement };
 }
 function renderDailyReport() {
-  const stats = dailyReportStats();
+  const loading = typeof canPersistReports === "function" && canPersistReports() && !state.reportsLoaded;
+  const stats = loading ? { monthlyCount: "…", lastUpdated: "…", avgAchievement: "…" } : dailyReportStats();
   const [year, month] = currentIsoDate().split("-");
   return `
     <section class="grid report-stats-grid">
-      <article class="card stat-card ok"><div class="stat-top"><div class="stat-label">月別日報数</div><span class="metric-badge attend">${icon("approvals")}</span></div><div class="stat-value">${stats.monthlyCount}件</div><div class="stat-note">${year}年${Number(month)}月</div></article>
+      <article class="card stat-card ok"><div class="stat-top"><div class="stat-label">月別日報数</div><span class="metric-badge attend">${icon("approvals")}</span></div><div class="stat-value">${loading ? "…" : `${stats.monthlyCount}件`}</div><div class="stat-note">${year}年${Number(month)}月</div></article>
       <article class="card stat-card primary"><div class="stat-top"><div class="stat-label">最終更新日</div><span class="metric-badge time">${icon("history")}</span></div><div class="stat-value">${escapeHtml(stats.lastUpdated)}</div><div class="stat-note">直近に作成した日報</div></article>
       <article class="card stat-card warn"><div class="stat-top"><div class="stat-label">自己達成度平均</div><span class="metric-badge over">${icon("report")}</span></div><div class="stat-value">${stats.avgAchievement}</div><div class="stat-note">記録済み日報の平均</div></article>
     </section>
@@ -353,12 +358,12 @@ function renderDailyReport() {
             <p>作成済みの日報を編集または削除できます</p>
           </div>
           <div class="field-row">
-            ${badge("normal", `${state.dailyReports.length}件`)}
-            ${state.dailyReportFormOpen ? "" : `<button class="button primary compact" data-action="open-report-form">${icon("plus")}作成する</button>`}
+            ${badge("normal", loading ? "読み込み中" : `${state.dailyReports.length}件`)}
+            ${state.dailyReportFormOpen ? "" : `<button class="button primary compact" data-action="open-report-form">${icon("plus")}日報作成</button>`}
           </div>
         </div>
         <div class="report-list">
-          ${state.dailyReports.length ? state.dailyReports.map(renderDailyReportItem).join("") : '<div class="empty">日報はまだありません</div>'}
+          ${loading ? renderLoadingBlock() : (state.dailyReports.length ? state.dailyReports.map(renderDailyReportItem).join("") : '<div class="empty">日報はまだありません</div>')}
         </div>
       </div>
     </section>

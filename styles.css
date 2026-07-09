@@ -1066,6 +1066,36 @@ tr:last-child td {
   color: var(--muted);
   text-align: center;
 }
+.loading-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.loading-block .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spinner-rotate 0.7s linear infinite;
+}
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.loading-spinner {
+  display: inline-grid;
+  place-items: center;
+  animation: spinner-rotate 1s linear infinite;
+}
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .drawer-backdrop {
   display: none;
 }
@@ -1168,12 +1198,23 @@ tr:last-child td {
     font-size: 12px;
   }
   .calendar-grid {
-    grid-template-columns: repeat(7, minmax(42px, 1fr));
+    grid-template-columns: repeat(7, minmax(64px, 1fr));
     overflow-x: auto;
   }
   .calendar-day {
     min-height: 96px;
-    padding: 8px;
+    padding: 8px 6px;
+  }
+  .calendar-marks {
+    font-size: 11px;
+  }
+  .calendar-marks span {
+    gap: 4px;
+  }
+  .calendar-marks .dot {
+    width: 6px;
+    height: 6px;
+    flex-basis: 6px;
   }
   .bottom-nav {
     position: fixed;
